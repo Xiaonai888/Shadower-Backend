@@ -1,30 +1,97 @@
-const khmerIntroduction =
-  "សួស្តី! ខ្ញុំឈ្មោះ Shadower។ ខ្ញុំជាជំនួយការ AI សម្រាប់ជួយអ្នកបង្កើត និងសរសេររឿងប្រលោមលោកជាភាសាខ្មែរ និងអង់គ្លេស។";
+import OpenAI from "openai";
+import { SHADOWER_INSTRUCTIONS } from "../config/shadowerPrompt.js";
 
-const englishIntroduction =
-  "Hello! I’m Shadower, an AI assistant designed to help you create and write novels in Khmer and English.";
+const DEFAULT_MODEL = "gpt-5.4-mini";
 
-const limitedReply =
-  "ឥឡូវនេះខ្ញុំកំពុងដំណើរការដំណាក់កាលដំបូង ហើយអាចឆ្លើយតែ សួស្តី, Hi ឬ Hello សិន។";
+let openaiClient;
 
-function normalizeMessage(message) {
-  return message
-    .trim()
-    .toLowerCase()
-    .replace(/[!?.។]+$/g, "")
-    .replace(/\s+/g, " ");
+function createPublicError(statusCode, publicMessage) {
+  const error = new Error(publicMessage);
+  error.statusCode = statusCode;
+  error.publicMessage = publicMessage;
+  return error;
 }
 
-export function createChatReply(message) {
-  const normalized = normalizeMessage(message);
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
 
-  if (/^សួស្តី(?:\s|$)/u.test(normalized)) {
-    return khmerIntroduction;
+  if (!apiKey) {
+    throw createPublicError(
+      503,
+      "Shadower AI is not configured yet. OPENAI_API_KEY is missing."
+    );
   }
 
-  if (/^(hi|hello)(?:\s|$)/u.test(normalized)) {
-    return englishIntroduction;
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey,
+      timeout: 45000,
+      maxRetries: 1
+    });
   }
 
-  return limitedReply;
+  return openaiClient;
+}
+
+function mapOpenAIError(error) {
+  if (error?.status === 401) {
+    return createPublicError(
+      503,
+      "Shadower AI configuration is invalid. Please check the OpenAI API key."
+    );
+  }
+
+  if (error?.status === 429) {
+    return createPublicError(
+      429,
+      "Shadower AI usage limit has been reached. Please try again later."
+    );
+  }
+
+  if (
+    error?.name === "APIConnectionTimeoutError" ||
+    error?.code === "ETIMEDOUT"
+  ) {
+    return createPublicError(
+      504,
+      "Shadower AI took too long to respond. Please try again."
+    );
+  }
+
+  return createPublicError(
+    502,
+    "Shadower AI could not generate a response. Please try again."
+  );
+}
+
+export async function createChatReply(message) {
+  try {
+    const response = await getOpenAIClient().responses.create({
+      model: process.env.OPENAI_MODEL?.trim() || DEFAULT_MODEL,
+      reasoning: {
+        effort: "low"
+      },
+      instructions: SHADOWER_INSTRUCTIONS,
+      input: message,
+      max_output_tokens: 1200,
+      store: false
+    });
+
+    const reply = response.output_text?.trim();
+
+    if (!reply) {
+      throw createPublicError(
+        502,
+        "Shadower AI returned an empty response. Please try again."
+      );
+    }
+
+    return reply;
+  } catch (error) {
+    if (error?.publicMessage) {
+      throw error;
+    }
+
+    throw mapOpenAIError(error);
+  }
 }
