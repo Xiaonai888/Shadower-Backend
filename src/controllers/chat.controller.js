@@ -8,7 +8,6 @@ const MAX_HISTORY_CHARACTERS = 30000;
 const MAX_MESSAGE_CHARACTERS = 12000;
 const MAX_MODEL_CHARACTERS = 160;
 const ALLOWED_ROLES = new Set(["user", "assistant"]);
-const ALLOWED_PROVIDERS = new Set(["my-ai", "openai"]);
 const ALLOWED_INTELLIGENCE = new Set(["instant", "medium", "high"]);
 
 function normalizeHistory(history) {
@@ -71,7 +70,7 @@ export async function getChatModels(req, res) {
 
     return res.status(500).json({
       ok: false,
-      message: "Unable to load AI providers and models."
+      message: "Unable to load My AI models."
     });
   }
 }
@@ -80,7 +79,6 @@ export async function sendChatMessage(req, res) {
   const {
     message,
     history,
-    provider = "my-ai",
     model,
     intelligence = "high"
   } = req.body ?? {};
@@ -101,13 +99,6 @@ export async function sendChatMessage(req, res) {
     });
   }
 
-  if (!ALLOWED_PROVIDERS.has(provider)) {
-    return res.status(400).json({
-      ok: false,
-      message: "Invalid AI provider"
-    });
-  }
-
   if (
     typeof model !== "string" ||
     !model.trim() ||
@@ -115,7 +106,7 @@ export async function sendChatMessage(req, res) {
   ) {
     return res.status(400).json({
       ok: false,
-      message: "A valid AI model is required"
+      message: "A valid My AI model is required"
     });
   }
 
@@ -130,7 +121,6 @@ export async function sendChatMessage(req, res) {
     const result = await createChatReply({
       message: cleanMessage,
       history: normalizeHistory(history),
-      provider,
       model: model.trim(),
       intelligence
     });
@@ -138,18 +128,16 @@ export async function sendChatMessage(req, res) {
     return res.status(200).json({
       ok: true,
       reply: result.reply,
-      provider: result.provider,
+      provider: "my-ai",
       model: result.model,
       intelligence: result.intelligence
     });
   } catch (error) {
     console.error("Chat generation failed", {
       name: error?.name,
-      status: error?.status,
       statusCode: error?.statusCode,
       code: error?.code,
       message: error?.message,
-      provider,
       model
     });
 
@@ -157,7 +145,7 @@ export async function sendChatMessage(req, res) {
       ok: false,
       message:
         error?.publicMessage ||
-        "Shadower AI is temporarily unavailable. Please try again."
+        "Shadower My AI is temporarily unavailable. Please try again."
     });
   }
 }
