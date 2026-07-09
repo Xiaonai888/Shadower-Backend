@@ -10,15 +10,27 @@ function createDatabaseError(error, publicMessage) {
   return databaseError;
 }
 
+function getChatSelectFields() {
+  return [
+    "id",
+    "project_id",
+    "title",
+    "model",
+    "intelligence",
+    "is_pinned",
+    "is_archived",
+    "created_at",
+    "updated_at"
+  ].join(", ");
+}
+
 export async function listChatSessions({ limit = 50 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
   const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
     .from("ai_chats")
-    .select(
-      "id, project_id, title, model, intelligence, is_pinned, is_archived, created_at, updated_at"
-    )
+    .select(getChatSelectFields())
     .is("owner_id", null)
     .is("deleted_at", null)
     .eq("is_archived", false)
@@ -69,13 +81,78 @@ export async function createChatSession({
       model: cleanModel,
       intelligence: cleanIntelligence
     })
-    .select(
-      "id, project_id, title, model, intelligence, is_pinned, is_archived, created_at, updated_at"
-    )
+    .select(getChatSelectFields())
     .single();
 
   if (error) {
     throw createDatabaseError(error, "Unable to create a new chat.");
+  }
+
+  return data;
+}
+
+export async function updateChatSession({
+  chatId,
+  title,
+  projectId,
+  isPinned,
+  isArchived
+}) {
+  const updates = {};
+
+  if (typeof title === "string") {
+    updates.title = title.trim().slice(0, 160);
+  }
+
+  if (projectId === null || typeof projectId === "string") {
+    updates.project_id =
+      typeof projectId === "string" && projectId.trim()
+        ? projectId.trim()
+        : null;
+  }
+
+  if (typeof isPinned === "boolean") {
+    updates.is_pinned = isPinned;
+  }
+
+  if (typeof isArchived === "boolean") {
+    updates.is_archived = isArchived;
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from("ai_chats")
+    .update(updates)
+    .eq("id", chatId)
+    .is("owner_id", null)
+    .is("deleted_at", null)
+    .select(getChatSelectFields())
+    .single();
+
+  if (error) {
+    throw createDatabaseError(error, "Unable to update this chat.");
+  }
+
+  return data;
+}
+
+export async function deleteChatSession(chatId) {
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from("ai_chats")
+    .update({
+      deleted_at: new Date().toISOString()
+    })
+    .eq("id", chatId)
+    .is("owner_id", null)
+    .is("deleted_at", null)
+    .select("id")
+    .single();
+
+  if (error) {
+    throw createDatabaseError(error, "Unable to delete this chat.");
   }
 
   return data;
