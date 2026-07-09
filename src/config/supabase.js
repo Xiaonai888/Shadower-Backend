@@ -4,9 +4,11 @@ let supabaseAdmin = null;
 
 function getSupabaseCredentials() {
   const url = process.env.SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const secretKey =
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
-  if (!url || !serviceRoleKey) {
+  if (!url || !secretKey) {
     const error = new Error("Supabase is not configured.");
     error.statusCode = 503;
     error.publicMessage = "Supabase is not configured in Render.";
@@ -15,14 +17,17 @@ function getSupabaseCredentials() {
 
   return {
     url,
-    serviceRoleKey
+    secretKey
   };
 }
 
 export function isSupabaseConfigured() {
   return Boolean(
     process.env.SUPABASE_URL?.trim() &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+      (
+        process.env.SUPABASE_SECRET_KEY?.trim() ||
+        process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+      )
   );
 }
 
@@ -31,9 +36,9 @@ export function getSupabaseAdmin() {
     return supabaseAdmin;
   }
 
-  const { url, serviceRoleKey } = getSupabaseCredentials();
+  const { url, secretKey } = getSupabaseCredentials();
 
-  supabaseAdmin = createClient(url, serviceRoleKey, {
+  supabaseAdmin = createClient(url, secretKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
