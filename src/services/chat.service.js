@@ -1,31 +1,23 @@
 import {
-  createOllamaReply,
-  getOllamaModels,
-  isOllamaConfigured
-} from "./ollama.service.js";
+  createCloudflareReply,
+  getCloudflareModels,
+  isCloudflareAiConfigured
+} from "./cloudflareAi.service.js";
 
 export async function getChatModelCatalog() {
-  const configured = isOllamaConfigured();
-  const ollamaModels = configured
-    ? await getOllamaModels({ silent: true })
-    : [];
-
-  let status = "My AI model server is not configured yet";
-
-  if (configured && ollamaModels.length > 0) {
-    status = "Connected";
-  } else if (configured) {
-    status = "My AI model server is unreachable or has no installed models";
-  }
+  const configured = isCloudflareAiConfigured();
+  const models = getCloudflareModels();
 
   return {
     providers: [
       {
         id: "my-ai",
         label: "My AI",
-        available: configured && ollamaModels.length > 0,
-        status,
-        models: ollamaModels
+        available: configured,
+        status: configured
+          ? "Connected to Cloudflare Workers AI"
+          : "Cloudflare Workers AI is not configured in Render",
+        models
       }
     ],
     intelligenceLevels: [
@@ -51,7 +43,7 @@ export async function createChatReply({
   model,
   intelligence
 }) {
-  return createOllamaReply({
+  return createCloudflareReply({
     message,
     history,
     model,
