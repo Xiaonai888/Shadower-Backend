@@ -2,7 +2,7 @@ import { getMyAiInstructions } from "../config/myAiRules.js";
 
 const API_ROOT = "https://api.cloudflare.com/client/v4";
 const DEFAULT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
-const REQUEST_TIMEOUT_MS = 120000;
+const REQUEST_TIMEOUT_MS = 180000;
 
 const MODEL_CATALOG = [
   {
@@ -55,25 +55,51 @@ async function fetchWithTimeout(url, options, timeoutMs = REQUEST_TIMEOUT_MS) {
 function getGenerationSettings(intelligence) {
   if (intelligence === "instant") {
     return {
-      max_tokens: 700,
-      temperature: 0.55,
+      max_tokens: 1000,
+      temperature: 0.5,
       top_p: 0.85
     };
   }
 
   if (intelligence === "medium") {
     return {
-      max_tokens: 1600,
-      temperature: 0.65,
+      max_tokens: 2600,
+      temperature: 0.62,
       top_p: 0.9
     };
   }
 
   return {
-    max_tokens: 3000,
-    temperature: 0.72,
+    max_tokens: 5000,
+    temperature: 0.68,
     top_p: 0.92
   };
+}
+
+function getResponseDepthInstruction(intelligence) {
+  if (intelligence === "instant") {
+    return [
+      "Response mode: Instant.",
+      "Answer quickly and directly, but still complete every essential part.",
+      "Do not end mid-sentence or omit the main conclusion."
+    ].join(" ");
+  }
+
+  if (intelligence === "medium") {
+    return [
+      "Response mode: Medium.",
+      "Give a complete, well-explained answer with useful context and clear structure.",
+      "For multi-part questions, answer every part before concluding."
+    ].join(" ");
+  }
+
+  return [
+    "Response mode: High.",
+    "Give a thorough and fully developed answer.",
+    "Cover every important part of the request with enough explanation, examples, or sections when useful.",
+    "Do not compress a complex request into a short paragraph.",
+    "For long-form writing, continue until the requested section reaches a natural and complete stopping point."
+  ].join(" ");
 }
 
 function getErrorMessage(payload, fallback) {
@@ -149,6 +175,10 @@ export async function createCloudflareReply({
             role: "system",
             content: getMyAiInstructions()
           },
+          {
+            role: "system",
+            content: getResponseDepthInstruction(intelligence)
+          },
           ...history,
           {
             role: "user",
@@ -157,7 +187,7 @@ export async function createCloudflareReply({
         ],
         stream: false,
         ...getGenerationSettings(intelligence),
-        repetition_penalty: 1.05
+        repetition_penalty: 1.03
       })
     });
 
@@ -217,7 +247,7 @@ export async function createCloudflareReply({
     if (error?.name === "AbortError") {
       throw createPublicError(
         504,
-        "My AI took too long to respond. Try a shorter request."
+        "My AI took too long to respond. Try again or use a shorter request."
       );
     }
 
