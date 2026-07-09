@@ -1,9 +1,12 @@
-import OpenAI from "openai";
-import { SHADOWER_INSTRUCTIONS } from "../config/shadowerPrompt.js";
-
-const DEFAULT_MODEL = "gpt-5.4-mini";
-
-let openaiClient;
+import {
+  createOpenAIReply,
+  getConfiguredOpenAIModels,
+  isOpenAIConfigured
+} from "./openai.service.js";
+import {
+  createOllamaReply,
+  getOllamaModels
+} from "./ollama.service.js";
 
 function createPublicError(statusCode, publicMessage) {
   const error = new Error(publicMessage);
@@ -12,92 +15,73 @@ function createPublicError(statusCode, publicMessage) {
   return error;
 }
 
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+export async function getChatModelCatalog() {
+  const ollamaModels = await getOllamaModels({ silent: true });
+  const openAIModels = getConfiguredOpenAIModels();
 
-  if (!apiKey) {
-    throw createPublicError(
-      503,
-      "Shadower AI is not configured yet. OPENAI_API_KEY is missing."
-    );
-  }
-
-  if (!openaiClient) {
-    openaiClient = new OpenAI({
-      apiKey,
-      timeout: 45000,
-      maxRetries: 1
-    });
-  }
-
-  return openaiClient;
-}
-
-function mapOpenAIError(error) {
-  if (error?.status === 401) {
-    return createPublicError(
-      503,
-      "Shadower AI configuration is invalid. Please check the OpenAI API key."
-    );
-  }
-
-  if (error?.status === 429) {
-    return createPublicError(
-      429,
-      "Shadower AI usage limit has been reached. Please try again later."
-    );
-  }
-
-  if (
-    error?.name === "APIConnectionTimeoutError" ||
-    error?.code === "ETIMEDOUT"
-  ) {
-    return createPublicError(
-      504,
-      "Shadower AI took too long to respond. Please try again."
-    );
-  }
-
-  return createPublicError(
-    502,
-    "Shadower AI could not generate a response. Please try again."
-  );
-}
-
-export async function createChatReply(message, history = []) {
-  try {
-    const response = await getOpenAIClient().responses.create({
-      model: process.env.OPENAI_MODEL?.trim() || DEFAULT_MODEL,
-      reasoning: {
-        effort: "low"
+  return {
+    providers: [
+      {
+        id: "my-ai",
+        label: "My AI",
+        available: ollamaModels.length > 0,
+        status:
+          ollamaModels.length > 0
+            ? "Connected"
+            : "Ollama is not connected or has no installed models",
+        models: ollamaModels
       },
-      instructions: SHADOWER_INSTRUCTIONS,
-      input: [
-        ...history,
-        {
-          role: "user",
-          content: message
-        }
-      ],
-      max_output_tokens: 1200,
-      store: false
+      {
+        id: "openai",
+        label: "OpenAI",
+        available: isOpenAIConfigured(),
+        status: isOpenAIConfigured()
+          ? "Connected"
+          : "OPENAI_API_KEY is missing",
+        models: openAIModels
+      }
+    ],
+    intelligenceLevels: [
+      {
+        id: "instant",
+        label: "Instant"
+      },
+      {
+        id: "medium",
+        label: "Medium"
+      },
+      {
+        id: "high",
+        label: "High"
+      }
+    ]
+  };
+}
+
+export async function createChatReply({
+  message,
+  history,
+  provider,
+  model,
+  intelligence
+}) {
+  if (provider === "my-ai") {
+    return createOllamaReply({
+      message,
+      history,
+      model,
+      intelligence
     });
-
-    const reply = response.output_text?.trim();
-
-    if (!reply) {
-      throw createPublicError(
-        502,
-        "Shadower AI returned an empty response. Please try again."
-      );
-    }
-
-    return reply;
-  } catch (error) {
-    if (error?.publicMessage) {
-      throw error;
-    }
-
-    throw mapOpenAIError(error);
   }
+
+  if (provider === "openai") {
+    return createOpenAIReply({
+      message,
+      history,
+      model,
+      intelligence
+    });
+  }
+
+  throw createPublicError(400, "The selected AI provider is not supported.");
 }

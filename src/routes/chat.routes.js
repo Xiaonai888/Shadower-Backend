@@ -1,8 +1,12 @@
 import { Router } from "express";
-import { sendChatMessage } from "../controllers/chat.controller.js";
+import {
+  getChatModels,
+  sendChatMessage
+} from "../controllers/chat.controller.js";
 
 const router = Router();
 
+router.get("/models", getChatModels);
 router.post("/", sendChatMessage);
 
 export default router;

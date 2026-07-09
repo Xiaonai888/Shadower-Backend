@@ -1,9 +1,15 @@
-import { createChatReply } from "../services/chat.service.js";
+import {
+  createChatReply,
+  getChatModelCatalog
+} from "../services/chat.service.js";
 
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_CHARACTERS = 30000;
 const MAX_MESSAGE_CHARACTERS = 12000;
+const MAX_MODEL_CHARACTERS = 160;
 const ALLOWED_ROLES = new Set(["user", "assistant"]);
+const ALLOWED_PROVIDERS = new Set(["my-ai", "openai"]);
+const ALLOWED_INTELLIGENCE = new Set(["instant", "medium", "high"]);
 
 function normalizeHistory(history) {
   if (!Array.isArray(history)) {
@@ -49,8 +55,35 @@ function normalizeHistory(history) {
   return normalized;
 }
 
+export async function getChatModels(req, res) {
+  try {
+    const catalog = await getChatModelCatalog();
+
+    return res.status(200).json({
+      ok: true,
+      ...catalog
+    });
+  } catch (error) {
+    console.error("Model catalog failed", {
+      name: error?.name,
+      message: error?.message
+    });
+
+    return res.status(500).json({
+      ok: false,
+      message: "Unable to load AI providers and models."
+    });
+  }
+}
+
 export async function sendChatMessage(req, res) {
-  const { message, history } = req.body ?? {};
+  const {
+    message,
+    history,
+    provider = "my-ai",
+    model,
+    intelligence = "high"
+  } = req.body ?? {};
 
   if (typeof message !== "string" || !message.trim()) {
     return res.status(400).json({
@@ -68,15 +101,46 @@ export async function sendChatMessage(req, res) {
     });
   }
 
+  if (!ALLOWED_PROVIDERS.has(provider)) {
+    return res.status(400).json({
+      ok: false,
+      message: "Invalid AI provider"
+    });
+  }
+
+  if (
+    typeof model !== "string" ||
+    !model.trim() ||
+    model.trim().length > MAX_MODEL_CHARACTERS
+  ) {
+    return res.status(400).json({
+      ok: false,
+      message: "A valid AI model is required"
+    });
+  }
+
+  if (!ALLOWED_INTELLIGENCE.has(intelligence)) {
+    return res.status(400).json({
+      ok: false,
+      message: "Invalid intelligence level"
+    });
+  }
+
   try {
-    const reply = await createChatReply(
-      cleanMessage,
-      normalizeHistory(history)
-    );
+    const result = await createChatReply({
+      message: cleanMessage,
+      history: normalizeHistory(history),
+      provider,
+      model: model.trim(),
+      intelligence
+    });
 
     return res.status(200).json({
       ok: true,
-      reply
+      reply: result.reply,
+      provider: result.provider,
+      model: result.model,
+      intelligence: result.intelligence
     });
   } catch (error) {
     console.error("Chat generation failed", {
@@ -84,7 +148,9 @@ export async function sendChatMessage(req, res) {
       status: error?.status,
       statusCode: error?.statusCode,
       code: error?.code,
-      message: error?.message
+      message: error?.message,
+      provider,
+      model
     });
 
     return res.status(error?.statusCode || 500).json({
