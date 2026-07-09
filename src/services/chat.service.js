@@ -1,21 +1,30 @@
 import {
   createOllamaReply,
-  getOllamaModels
+  getOllamaModels,
+  isOllamaConfigured
 } from "./ollama.service.js";
 
 export async function getChatModelCatalog() {
-  const ollamaModels = await getOllamaModels({ silent: true });
+  const configured = isOllamaConfigured();
+  const ollamaModels = configured
+    ? await getOllamaModels({ silent: true })
+    : [];
+
+  let status = "My AI model server is not configured yet";
+
+  if (configured && ollamaModels.length > 0) {
+    status = "Connected";
+  } else if (configured) {
+    status = "My AI model server is unreachable or has no installed models";
+  }
 
   return {
     providers: [
       {
         id: "my-ai",
         label: "My AI",
-        available: ollamaModels.length > 0,
-        status:
-          ollamaModels.length > 0
-            ? "Connected"
-            : "Ollama is not connected or has no installed models",
+        available: configured && ollamaModels.length > 0,
+        status,
         models: ollamaModels
       }
     ],
