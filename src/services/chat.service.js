@@ -1,3 +1,4 @@
+import { findFastAnswer } from "../data/fastAnswers.js";
 import {
   createCloudflareReply,
   getCloudflareModels,
@@ -43,6 +44,18 @@ export async function createChatReply({
   model,
   intelligence
 }) {
+  const fastAnswer = findFastAnswer(message);
+
+  if (fastAnswer) {
+    return {
+      reply: fastAnswer.reply,
+      model: "fast-answer",
+      intelligence,
+      source: fastAnswer.source,
+      answerId: fastAnswer.answerId
+    };
+  }
+
   return createCloudflareReply({
     message,
     history,
