@@ -2,6 +2,8 @@ import {
   createChatReply,
   getChatModelCatalog
 } from "../services/chat.service.js";
+import { addChatMessages } from "../services/chatMessages.service.js";
+import { updateChatSession } from "../services/chatSessions.service.js";
 
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_CHARACTERS = 30000;
@@ -9,6 +11,8 @@ const MAX_MESSAGE_CHARACTERS = 12000;
 const MAX_MODEL_CHARACTERS = 160;
 const ALLOWED_ROLES = new Set(["user", "assistant"]);
 const ALLOWED_INTELLIGENCE = new Set(["instant", "medium", "high"]);
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeHistory(history) {
   if (!Array.isArray(history)) {
@@ -54,6 +58,11 @@ function normalizeHistory(history) {
   return normalized;
 }
 
+function createAutoTitle(message) {
+  const firstLine = message.split(/\r?\n/)[0]?.trim() || "New Chat";
+  return firstLine.length > 60 ? `${firstLine.slice(0, 57)}...` : firstLine;
+}
+
 export async function getChatModels(req, res) {
   try {
     const catalog = await getChatModelCatalog();
@@ -77,11 +86,19 @@ export async function getChatModels(req, res) {
 
 export async function sendChatMessage(req, res) {
   const {
+    chatId = null,
     message,
     history,
     model,
     intelligence = "high"
   } = req.body ?? {};
+
+  if (chatId !== null && chatId !== undefined && !UUID_PATTERN.test(chatId)) {
+    return res.status(400).json({
+      ok: false,
+      message: "Invalid chat ID"
+    });
+  }
 
   if (typeof message !== "string" || !message.trim()) {
     return res.status(400).json({
@@ -125,12 +142,43 @@ export async function sendChatMessage(req, res) {
       intelligence
     });
 
+    if (chatId) {
+      await addChatMessages({
+        chatId,
+        messages: [
+          {
+            role: "user",
+            content: cleanMessage
+          },
+          {
+            role: "assistant",
+            content: result.reply,
+            model: result.model,
+            intelligence: result.intelligence,
+            metadata: {
+              provider: "my-ai",
+              source: result.source ?? null,
+              answerId: result.answerId ?? null
+            }
+          }
+        ]
+      });
+
+      if (!Array.isArray(history) || history.length === 0) {
+        await updateChatSession({
+          chatId,
+          title: createAutoTitle(cleanMessage)
+        });
+      }
+    }
+
     return res.status(200).json({
       ok: true,
       reply: result.reply,
       provider: "my-ai",
       model: result.model,
-      intelligence: result.intelligence
+      intelligence: result.intelligence,
+      chatId
     });
   } catch (error) {
     console.error("Chat generation failed", {

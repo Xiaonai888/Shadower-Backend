@@ -4,6 +4,7 @@ import {
   listChatSessions,
   updateChatSession as updateChatSessionRecord
 } from "../services/chatSessions.service.js";
+import { listChatMessages } from "../services/chatMessages.service.js";
 
 const ALLOWED_INTELLIGENCE = new Set(["instant", "medium", "high"]);
 const UUID_PATTERN =
@@ -103,6 +104,31 @@ export async function createChatSession(req, res) {
     });
   } catch (error) {
     return sendError(res, error, "Unable to create a new chat.");
+  }
+}
+
+export async function getChatMessages(req, res) {
+  const { id } = req.params;
+
+  if (!isValidUuid(id)) {
+    return res.status(400).json({
+      ok: false,
+      message: "Invalid chat ID."
+    });
+  }
+
+  try {
+    const messages = await listChatMessages({
+      chatId: id,
+      limit: req.query?.limit
+    });
+
+    return res.status(200).json({
+      ok: true,
+      messages
+    });
+  } catch (error) {
+    return sendError(res, error, "Unable to load chat messages.");
   }
 }
 
