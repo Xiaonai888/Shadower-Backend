@@ -18,6 +18,6 @@ export const corsOptions = {
 
     return callback(new Error(`Not allowed by CORS: ${origin}`));
   },
-  methods: ["GET", "POST", "OPTIONS"],
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 };
