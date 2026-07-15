@@ -3,7 +3,10 @@ import {
   getChatModelCatalog
 } from "../services/chat.service.js";
 import { addChatMessages } from "../services/chatMessages.service.js";
+import { buildSmartChatContext } from "../services/chatContext.service.js";
+import { refreshChatMemory } from "../services/chatMemory.service.js";
 import { updateChatSession } from "../services/chatSessions.service.js";
+
 
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_CHARACTERS = 30000;
@@ -134,13 +137,21 @@ export async function sendChatMessage(req, res) {
     });
   }
 
-  try {
+   try {
+    const context = await buildSmartChatContext({
+      chatId,
+      message: cleanMessage,
+      clientHistory: normalizeHistory(history)
+    });
+
     const result = await createChatReply({
       message: cleanMessage,
-      history: normalizeHistory(history),
+      history: context.history,
       model: model.trim(),
-      intelligence
+      intelligence,
+      systemContext: context.systemContext
     });
+
 
     if (chatId) {
       await addChatMessages({
@@ -158,25 +169,26 @@ export async function sendChatMessage(req, res) {
             metadata: {
               provider: "my-ai",
               source: result.source ?? null,
-              answerId: result.answerId ?? null
+              answerId: result.answerId ?? null,
+              intent: context.intent
             }
           }
         ]
       });
 
-      if (!Array.isArray(history) || history.length === 0) {
+       if (context.history.length === 0) {
         await updateChatSession({
           chatId,
           title: createAutoTitle(cleanMessage)
         });
       }
-    }
 
     return res.status(200).json({
       ok: true,
       reply: result.reply,
       provider: "my-ai",
       model: result.model,
+      intent: context.intent,
       intelligence: result.intelligence,
       chatId
     });
@@ -197,3 +209,13 @@ export async function sendChatMessage(req, res) {
     });
   }
 }
+
+ setImmediate(() => {
+        refreshChatMemory(chatId).catch((memoryError) => {
+          console.error("Chat memory refresh failed", {
+            chatId,
+            name: memoryError?.name,
+            message: memoryError?.message
+          });
+        });
+      });
