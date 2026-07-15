@@ -42,8 +42,10 @@ export async function createChatReply({
   message,
   history,
   model,
-  intelligence
+  intelligence,
+  systemContext = ""
 }) {
+
   const fastAnswer = findFastAnswer(message);
 
   if (fastAnswer) {
@@ -56,10 +58,19 @@ export async function createChatReply({
     };
   }
 
+ const routedHistory = systemContext
+    ? [
+        {
+          role: "system",
+          content: systemContext
+        },
+        ...history
+      ]
+    : history;
+
   return createCloudflareReply({
     message,
-    history,
+    history: routedHistory,
     model,
     intelligence
   });
-}
