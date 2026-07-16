@@ -7,6 +7,7 @@ import chatRoutes from "./src/routes/chat.routes.js";
 import chatSessionsRoutes from "./src/routes/chatSessions.routes.js";
 import healthRoutes from "./src/routes/health.routes.js";
 import projectsRoutes from "./src/routes/projects.routes.js";
+import voiceCharactersRoutes from "./src/routes/voiceCharacters.routes.js";
 import { notFound } from "./src/middleware/notFound.middleware.js";
 import { errorHandler } from "./src/middleware/error.middleware.js";
 
@@ -30,6 +31,7 @@ app.use("/health", healthRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/chats", chatSessionsRoutes);
 app.use("/api/projects", projectsRoutes);
+app.use("/api/voice/characters", voiceCharactersRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
