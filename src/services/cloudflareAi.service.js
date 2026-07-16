@@ -1,4 +1,5 @@
 import { getMyAiInstructions } from "../config/myAiRules.js";
+import { detectChatIntent } from "./chatIntent.service.js";
 
 const API_ROOT = "https://api.cloudflare.com/client/v4";
 const DEFAULT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
@@ -52,7 +53,35 @@ async function fetchWithTimeout(url, options, timeoutMs = REQUEST_TIMEOUT_MS) {
   }
 }
 
-function getGenerationSettings(intelligence) {
+function getSummaryGenerationSettings(intelligence) {
+  if (intelligence === "instant") {
+    return {
+      max_tokens: 450,
+      temperature: 0.2,
+      top_p: 0.72
+    };
+  }
+
+  if (intelligence === "medium") {
+    return {
+      max_tokens: 800,
+      temperature: 0.25,
+      top_p: 0.78
+    };
+  }
+
+  return {
+    max_tokens: 1200,
+    temperature: 0.28,
+    top_p: 0.82
+  };
+}
+
+function getGenerationSettings(intelligence, intent) {
+  if (intent === "summarize") {
+    return getSummaryGenerationSettings(intelligence);
+  }
+
   if (intelligence === "instant") {
     return {
       max_tokens: 1000,
@@ -76,7 +105,22 @@ function getGenerationSettings(intelligence) {
   };
 }
 
-function getResponseDepthInstruction(intelligence) {
+function getSummaryDepthInstruction() {
+  return [
+    "Response mode: Summary.",
+    "Produce a condensed result instead of repeating or rewriting the source.",
+    "Retain only high-value events, facts, decisions, causes, outcomes, and unresolved points.",
+    "Target roughly 15 to 25 percent of the source length unless the user requests another size.",
+    "Do not copy long passages, preserve every dialogue line, or narrate every scene.",
+    "Prefer short sections or bullets and stop after the essential information is covered."
+  ].join(" ");
+}
+
+function getResponseDepthInstruction(intelligence, intent) {
+  if (intent === "summarize") {
+    return getSummaryDepthInstruction();
+  }
+
   if (intelligence === "instant") {
     return [
       "Response mode: Instant.",
@@ -158,6 +202,7 @@ export async function createCloudflareReply({
     );
   }
 
+  const intent = detectChatIntent(message);
   const { accountId, apiToken } = getCredentials();
   const endpoint = `${API_ROOT}/accounts/${accountId}/ai/run/${model}`;
 
@@ -177,7 +222,7 @@ export async function createCloudflareReply({
           },
           {
             role: "system",
-            content: getResponseDepthInstruction(intelligence)
+            content: getResponseDepthInstruction(intelligence, intent)
           },
           ...history,
           {
@@ -186,8 +231,8 @@ export async function createCloudflareReply({
           }
         ],
         stream: false,
-        ...getGenerationSettings(intelligence),
-        repetition_penalty: 1.03
+        ...getGenerationSettings(intelligence, intent),
+        repetition_penalty: intent === "summarize" ? 1.08 : 1.03
       })
     });
 
