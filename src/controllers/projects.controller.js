@@ -1,4 +1,23 @@
-import { listProjects } from "../services/projects.service.js";
+import {
+  getProjectById,
+  listProjects
+} from "../services/projects.service.js";
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function sendError(res, error, fallbackMessage) {
+  console.error("Project request failed", {
+    name: error?.name,
+    statusCode: error?.statusCode,
+    message: error?.message
+  });
+
+  return res.status(error?.statusCode || 500).json({
+    ok: false,
+    message: error?.publicMessage || fallbackMessage
+  });
+}
 
 export async function getProjects(req, res) {
   try {
@@ -12,15 +31,28 @@ export async function getProjects(req, res) {
       projects
     });
   } catch (error) {
-    console.error("Project request failed", {
-      name: error?.name,
-      statusCode: error?.statusCode,
-      message: error?.message
-    });
+    return sendError(res, error, "Unable to load story projects.");
+  }
+}
 
-    return res.status(error?.statusCode || 500).json({
+export async function getProject(req, res) {
+  const projectId = req.params?.id?.trim();
+
+  if (!UUID_PATTERN.test(projectId || "")) {
+    return res.status(400).json({
       ok: false,
-      message: error?.publicMessage || "Unable to load story projects."
+      message: "Invalid project ID."
     });
+  }
+
+  try {
+    const project = await getProjectById(projectId);
+
+    return res.status(200).json({
+      ok: true,
+      project
+    });
+  } catch (error) {
+    return sendError(res, error, "Unable to load this story project.");
   }
 }
