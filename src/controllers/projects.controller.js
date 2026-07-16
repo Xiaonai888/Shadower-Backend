@@ -1,5 +1,6 @@
 import {
   getProjectById,
+  getProjectsSchema,
   listProjects
 } from "../services/projects.service.js";
 
@@ -32,6 +33,23 @@ export async function getProjects(req, res) {
     });
   } catch (error) {
     return sendError(res, error, "Unable to load story projects.");
+  }
+}
+
+export async function getProjectSchema(req, res) {
+  try {
+    const schema = await getProjectsSchema();
+
+    return res.status(200).json({
+      ok: true,
+      schema
+    });
+  } catch (error) {
+    return sendError(
+      res,
+      error,
+      "Unable to inspect the story project schema."
+    );
   }
 }
 
