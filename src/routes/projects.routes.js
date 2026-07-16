@@ -1,8 +1,12 @@
 import { Router } from "express";
-import { getProjects } from "../controllers/projects.controller.js";
+import {
+  getProject,
+  getProjects
+} from "../controllers/projects.controller.js";
 
 const router = Router();
 
 router.get("/", getProjects);
+router.get("/:id", getProject);
 
 export default router;
