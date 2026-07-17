@@ -65,6 +65,15 @@ function createAutoTitle(message) {
   return firstLine.length > 60 ? `${firstLine.slice(0, 57)}...` : firstLine;
 }
 
+function createAnalysisMetadata(context) {
+  return {
+    intent: context.intent,
+    requestKind: context.analysis?.requestKind ?? null,
+    analysisSource: context.analysis?.source ?? null,
+    analysisConfidence: context.analysis?.confidence ?? null
+  };
+}
+
 export async function getChatModels(req, res) {
   try {
     const catalog = await getChatModelCatalog();
@@ -152,15 +161,15 @@ export async function sendChatMessage(req, res) {
     });
 
     if (chatId) {
+      const analysisMetadata = createAnalysisMetadata(context);
+
       await addChatMessages({
         chatId,
         messages: [
           {
             role: "user",
             content: cleanMessage,
-            metadata: {
-              intent: context.intent
-            }
+            metadata: analysisMetadata
           },
           {
             role: "assistant",
@@ -171,7 +180,7 @@ export async function sendChatMessage(req, res) {
               provider: "my-ai",
               source: result.source ?? null,
               answerId: result.answerId ?? null,
-              intent: context.intent
+              ...analysisMetadata
             }
           }
         ]
@@ -202,6 +211,7 @@ export async function sendChatMessage(req, res) {
       model: result.model,
       intelligence: result.intelligence,
       intent: context.intent,
+      analysis: context.analysis,
       chatId
     });
   } catch (error) {
