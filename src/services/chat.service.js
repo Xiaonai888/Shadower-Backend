@@ -43,9 +43,9 @@ export async function createChatReply({
   history,
   model,
   intelligence,
+  intent = null,
   systemContext = ""
 }) {
-
   const fastAnswer = findFastAnswer(message);
 
   if (fastAnswer) {
@@ -58,7 +58,7 @@ export async function createChatReply({
     };
   }
 
- const routedHistory = systemContext
+  const routedHistory = systemContext
     ? [
         {
           role: "system",
@@ -72,6 +72,7 @@ export async function createChatReply({
     message,
     history: routedHistory,
     model,
-    intelligence
+    intelligence,
+    intent
   });
 }
