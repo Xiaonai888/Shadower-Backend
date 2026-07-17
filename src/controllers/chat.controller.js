@@ -70,7 +70,9 @@ function createAnalysisMetadata(context) {
     intent: context.intent,
     requestKind: context.analysis?.requestKind ?? null,
     analysisSource: context.analysis?.source ?? null,
-    analysisConfidence: context.analysis?.confidence ?? null
+    analysisConfidence: context.analysis?.confidence ?? null,
+    storyPlanSource: context.storyPlan?.source ?? null,
+    storyPlanMode: context.storyPlan?.mode ?? null
   };
 }
 
@@ -157,6 +159,7 @@ export async function sendChatMessage(req, res) {
       history: context.history,
       model: model.trim(),
       intelligence,
+      intent: context.intent,
       systemContext: context.systemContext
     });
 
@@ -212,6 +215,7 @@ export async function sendChatMessage(req, res) {
       intelligence: result.intelligence,
       intent: context.intent,
       analysis: context.analysis,
+      storyPlan: context.storyPlan,
       chatId
     });
   } catch (error) {
