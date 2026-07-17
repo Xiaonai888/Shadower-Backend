@@ -14,6 +14,18 @@ const MODEL_CATALOG = [
 ];
 
 const ALLOWED_MODELS = new Set(MODEL_CATALOG.map((model) => model.id));
+const ALLOWED_INTENTS = new Set([
+  "normal_chat",
+  "write_story",
+  "continue_story",
+  "rewrite",
+  "summarize",
+  "translate",
+  "create_character",
+  "create_outline",
+  "check_continuity",
+  "question_about_story"
+]);
 
 function createPublicError(statusCode, publicMessage) {
   const error = new Error(publicMessage);
@@ -77,11 +89,103 @@ function getSummaryGenerationSettings(intelligence) {
   };
 }
 
-function getGenerationSettings(intelligence, intent) {
-  if (intent === "summarize") {
-    return getSummaryGenerationSettings(intelligence);
+function getStoryGenerationSettings(intelligence) {
+  if (intelligence === "instant") {
+    return {
+      max_tokens: 1800,
+      temperature: 0.58,
+      top_p: 0.88
+    };
   }
 
+  if (intelligence === "medium") {
+    return {
+      max_tokens: 3600,
+      temperature: 0.64,
+      top_p: 0.91
+    };
+  }
+
+  return {
+    max_tokens: 6000,
+    temperature: 0.68,
+    top_p: 0.93
+  };
+}
+
+function getPrecisionGenerationSettings(intelligence) {
+  if (intelligence === "instant") {
+    return {
+      max_tokens: 1000,
+      temperature: 0.18,
+      top_p: 0.72
+    };
+  }
+
+  if (intelligence === "medium") {
+    return {
+      max_tokens: 2200,
+      temperature: 0.24,
+      top_p: 0.78
+    };
+  }
+
+  return {
+    max_tokens: 3800,
+    temperature: 0.3,
+    top_p: 0.82
+  };
+}
+
+function getRewriteGenerationSettings(intelligence) {
+  if (intelligence === "instant") {
+    return {
+      max_tokens: 1200,
+      temperature: 0.38,
+      top_p: 0.82
+    };
+  }
+
+  if (intelligence === "medium") {
+    return {
+      max_tokens: 2800,
+      temperature: 0.46,
+      top_p: 0.86
+    };
+  }
+
+  return {
+    max_tokens: 5000,
+    temperature: 0.52,
+    top_p: 0.9
+  };
+}
+
+function getTranslationGenerationSettings(intelligence) {
+  if (intelligence === "instant") {
+    return {
+      max_tokens: 1200,
+      temperature: 0.12,
+      top_p: 0.68
+    };
+  }
+
+  if (intelligence === "medium") {
+    return {
+      max_tokens: 2800,
+      temperature: 0.16,
+      top_p: 0.72
+    };
+  }
+
+  return {
+    max_tokens: 5000,
+    temperature: 0.2,
+    top_p: 0.76
+  };
+}
+
+function getDefaultGenerationSettings(intelligence) {
   if (intelligence === "instant") {
     return {
       max_tokens: 1000,
@@ -93,57 +197,156 @@ function getGenerationSettings(intelligence, intent) {
   if (intelligence === "medium") {
     return {
       max_tokens: 2600,
-      temperature: 0.62,
-      top_p: 0.9
+      temperature: 0.58,
+      top_p: 0.88
     };
   }
 
   return {
     max_tokens: 5000,
-    temperature: 0.68,
-    top_p: 0.92
+    temperature: 0.62,
+    top_p: 0.9
   };
 }
 
-function getSummaryDepthInstruction() {
+function getGenerationSettings(intelligence, intent) {
+  if (intent === "summarize") {
+    return getSummaryGenerationSettings(intelligence);
+  }
+
+  if (intent === "write_story" || intent === "continue_story") {
+    return getStoryGenerationSettings(intelligence);
+  }
+
+  if (
+    intent === "check_continuity" ||
+    intent === "question_about_story"
+  ) {
+    return getPrecisionGenerationSettings(intelligence);
+  }
+
+  if (intent === "rewrite") {
+    return getRewriteGenerationSettings(intelligence);
+  }
+
+  if (intent === "translate") {
+    return getTranslationGenerationSettings(intelligence);
+  }
+
+  return getDefaultGenerationSettings(intelligence);
+}
+
+function getTaskInstruction(intent) {
+  if (intent === "summarize") {
+    return [
+      "Task mode: Summary.",
+      "Produce a selective condensed result instead of repeating or rewriting the source.",
+      "Retain only high-value events, facts, decisions, causes, outcomes, and unresolved points.",
+      "Target roughly 15 to 25 percent of the source length unless the user requests another size.",
+      "Do not copy long passages or narrate every scene."
+    ].join(" ");
+  }
+
+  if (intent === "write_story" || intent === "continue_story") {
+    return [
+      "Task mode: Fiction writing.",
+      "Follow the supplied fiction execution plan and all must-not-change constraints.",
+      "Write polished prose, not planning notes or a recap.",
+      "For continuation, start immediately after the latest established ending without repeating prior material.",
+      "Preserve point of view, character knowledge, timeline, location, physical state, accessibility, relationships, objects, and unresolved threads.",
+      "Do not invent protected facts."
+    ].join(" ");
+  }
+
+  if (intent === "check_continuity") {
+    return [
+      "Task mode: Continuity review.",
+      "Diagnose contradictions and logic problems before suggesting changes.",
+      "Separate confirmed evidence from inference.",
+      "For every issue, state severity and the smallest safe correction.",
+      "Do not rewrite unaffected material."
+    ].join(" ");
+  }
+
+  if (intent === "question_about_story") {
+    return [
+      "Task mode: Story question.",
+      "Answer from supplied story context only.",
+      "Clearly separate confirmed canon, reasonable inference, and unknown information.",
+      "Do not fill missing facts with invention."
+    ].join(" ");
+  }
+
+  if (intent === "rewrite") {
+    return [
+      "Task mode: Rewrite.",
+      "Change only the requested material and problem.",
+      "Preserve names, meaning, chronology, point of view, characterization, and protected constraints.",
+      "Do not replace unrelated content."
+    ].join(" ");
+  }
+
+  if (intent === "translate") {
+    return [
+      "Task mode: Translation.",
+      "Translate faithfully without adding new content.",
+      "Preserve names, formatting, tone, chronology, and intentional ambiguity."
+    ].join(" ");
+  }
+
   return [
-    "Response mode: Summary.",
-    "Produce a condensed result instead of repeating or rewriting the source.",
-    "Retain only high-value events, facts, decisions, causes, outcomes, and unresolved points.",
-    "Target roughly 15 to 25 percent of the source length unless the user requests another size.",
-    "Do not copy long passages, preserve every dialogue line, or narrate every scene.",
-    "Prefer short sections or bullets and stop after the essential information is covered."
+    "Task mode: General.",
+    "Answer the newest request directly and completely.",
+    "Do not substitute a related or easier task.",
+    "State uncertainty when required information is missing."
   ].join(" ");
 }
 
-function getResponseDepthInstruction(intelligence, intent) {
-  if (intent === "summarize") {
-    return getSummaryDepthInstruction();
-  }
-
+function getDepthInstruction(intelligence) {
   if (intelligence === "instant") {
     return [
-      "Response mode: Instant.",
-      "Answer quickly and directly, but still complete every essential part.",
+      "Response depth: Instant.",
+      "Answer directly and complete every essential part.",
       "Do not end mid-sentence or omit the main conclusion."
     ].join(" ");
   }
 
   if (intelligence === "medium") {
     return [
-      "Response mode: Medium.",
-      "Give a complete, well-explained answer with useful context and clear structure.",
-      "For multi-part questions, answer every part before concluding."
+      "Response depth: Medium.",
+      "Give a complete, well-explained answer with clear structure.",
+      "For multi-part requests, complete every part before concluding."
     ].join(" ");
   }
 
   return [
-    "Response mode: High.",
+    "Response depth: High.",
     "Give a thorough and fully developed answer.",
-    "Cover every important part of the request with enough explanation, examples, or sections when useful.",
-    "Do not compress a complex request into a short paragraph.",
+    "Cover every important part with enough detail and structure.",
     "For long-form writing, continue until the requested section reaches a natural and complete stopping point."
   ].join(" ");
+}
+
+function getResponseInstruction(intelligence, intent) {
+  return `${getTaskInstruction(intent)} ${getDepthInstruction(intelligence)}`;
+}
+
+function getRepetitionPenalty(intent) {
+  if (intent === "summarize") {
+    return 1.08;
+  }
+
+  if (intent === "write_story" || intent === "continue_story") {
+    return 1.04;
+  }
+
+  return 1.03;
+}
+
+function resolveIntent(intent, message) {
+  return ALLOWED_INTENTS.has(intent)
+    ? intent
+    : detectChatIntent(message);
 }
 
 function getErrorMessage(payload, fallback) {
@@ -193,7 +396,8 @@ export async function createCloudflareReply({
   message,
   history = [],
   model = DEFAULT_MODEL,
-  intelligence = "high"
+  intelligence = "high",
+  intent = null
 }) {
   if (!ALLOWED_MODELS.has(model)) {
     throw createPublicError(
@@ -202,7 +406,7 @@ export async function createCloudflareReply({
     );
   }
 
-  const intent = detectChatIntent(message);
+  const resolvedIntent = resolveIntent(intent, message);
   const { accountId, apiToken } = getCredentials();
   const endpoint = `${API_ROOT}/accounts/${accountId}/ai/run/${model}`;
 
@@ -222,7 +426,10 @@ export async function createCloudflareReply({
           },
           {
             role: "system",
-            content: getResponseDepthInstruction(intelligence, intent)
+            content: getResponseInstruction(
+              intelligence,
+              resolvedIntent
+            )
           },
           ...history,
           {
@@ -231,8 +438,8 @@ export async function createCloudflareReply({
           }
         ],
         stream: false,
-        ...getGenerationSettings(intelligence, intent),
-        repetition_penalty: intent === "summarize" ? 1.08 : 1.03
+        ...getGenerationSettings(intelligence, resolvedIntent),
+        repetition_penalty: getRepetitionPenalty(resolvedIntent)
       })
     });
 
@@ -282,7 +489,8 @@ export async function createCloudflareReply({
       reply,
       provider: "my-ai",
       model,
-      intelligence
+      intelligence,
+      intent: resolvedIntent
     };
   } catch (error) {
     if (error?.publicMessage) {
