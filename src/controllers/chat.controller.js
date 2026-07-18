@@ -17,9 +17,7 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeHistory(history) {
-  if (!Array.isArray(history)) {
-    return [];
-  }
+  if (!Array.isArray(history)) return [];
 
   const normalized = [];
   let totalCharacters = 0;
@@ -36,25 +34,12 @@ function normalizeHistory(history) {
     }
 
     const text = item.text.trim().slice(0, MAX_MESSAGE_CHARACTERS);
+    if (!text) continue;
+    if (totalCharacters + text.length > MAX_HISTORY_CHARACTERS) break;
 
-    if (!text) {
-      continue;
-    }
-
-    if (totalCharacters + text.length > MAX_HISTORY_CHARACTERS) {
-      break;
-    }
-
-    normalized.unshift({
-      role: item.role,
-      content: text
-    });
-
+    normalized.unshift({ role: item.role, content: text });
     totalCharacters += text.length;
-
-    if (normalized.length >= MAX_HISTORY_MESSAGES) {
-      break;
-    }
+    if (normalized.length >= MAX_HISTORY_MESSAGES) break;
   }
 
   return normalized;
@@ -72,18 +57,33 @@ function createAnalysisMetadata(context) {
     analysisSource: context.analysis?.source ?? null,
     analysisConfidence: context.analysis?.confidence ?? null,
     storyPlanSource: context.storyPlan?.source ?? null,
-    storyPlanMode: context.storyPlan?.mode ?? null
+    storyPlanMode: context.storyPlan?.mode ?? null,
+    correctionCount: context.correctionMemory?.matches?.length ?? 0,
+    correctionSource: context.correctionMemory?.source ?? null
+  };
+}
+
+function createCorrectionResponse(correctionMemory) {
+  const matches = correctionMemory?.matches ?? [];
+
+  return {
+    source: correctionMemory?.source ?? "not_requested",
+    scannedCount: correctionMemory?.scannedCount ?? 0,
+    appliedCount: matches.length,
+    matches: matches.map((match) => ({
+      id: match.id,
+      score: match.score,
+      accepted: match.accepted,
+      errorType: match.errorType,
+      taskType: match.taskType
+    }))
   };
 }
 
 export async function getChatModels(req, res) {
   try {
     const catalog = await getChatModelCatalog();
-
-    return res.status(200).json({
-      ok: true,
-      ...catalog
-    });
+    return res.status(200).json({ ok: true, ...catalog });
   } catch (error) {
     console.error("Model catalog failed", {
       name: error?.name,
@@ -107,17 +107,11 @@ export async function sendChatMessage(req, res) {
   } = req.body ?? {};
 
   if (chatId !== null && chatId !== undefined && !UUID_PATTERN.test(chatId)) {
-    return res.status(400).json({
-      ok: false,
-      message: "Invalid chat ID"
-    });
+    return res.status(400).json({ ok: false, message: "Invalid chat ID" });
   }
 
   if (typeof message !== "string" || !message.trim()) {
-    return res.status(400).json({
-      ok: false,
-      message: "Message is required"
-    });
+    return res.status(400).json({ ok: false, message: "Message is required" });
   }
 
   const cleanMessage = message.trim();
@@ -216,6 +210,7 @@ export async function sendChatMessage(req, res) {
       intent: context.intent,
       analysis: context.analysis,
       storyPlan: context.storyPlan,
+      correctionMemory: createCorrectionResponse(context.correctionMemory),
       chatId
     });
   } catch (error) {
