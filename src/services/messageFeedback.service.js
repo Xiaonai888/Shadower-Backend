@@ -72,7 +72,7 @@ async function getPreviousUserMessage({ chatId, createdAt }) {
     .select("id, content")
     .eq("chat_id", chatId)
     .eq("role", "user")
-    .lt("created_at", createdAt)
+    .lte("created_at", createdAt)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
