@@ -2,9 +2,11 @@ import {
   createVoiceCharacter as createVoiceCharacterRecord,
   deleteVoiceCharacter as deleteVoiceCharacterRecord,
   getVoiceCharacter as getVoiceCharacterRecord,
+  getVoiceCharacterAvatarStorageKey,
   listVoiceCharacters,
   updateVoiceCharacter as updateVoiceCharacterRecord
 } from "../services/voiceCharacters.service.js";
+import { deleteR2Object } from "../services/r2.service.js";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -191,7 +193,13 @@ export async function deleteVoiceCharacter(req, res) {
   }
 
   try {
+    const avatarStorageKey = await getVoiceCharacterAvatarStorageKey(id);
     const deletedCharacterId = await deleteVoiceCharacterRecord(id);
+
+    if (avatarStorageKey) {
+      deleteR2Object(avatarStorageKey).catch(() => {});
+    }
+
     return res.status(200).json({ ok: true, deletedCharacterId });
   } catch (error) {
     return sendError(res, error, "Unable to delete this voice character.");
