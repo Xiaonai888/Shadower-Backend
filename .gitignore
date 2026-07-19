@@ -1,0 +1,3 @@
+.voice-venv/
+voice_engine/models/
+voice_engine/__pycache__/
