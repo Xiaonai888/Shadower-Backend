@@ -6,7 +6,8 @@ npm install
 python3 -m venv .voice-venv
 source .voice-venv/bin/activate
 
-python -m pip install --upgrade pip setuptools wheel
+python -m pip install --upgrade pip wheel
+python -m pip install setuptools==80.10.2
 python -m pip install \
   torch==2.1.2 \
   --index-url https://download.pytorch.org/whl/cpu
