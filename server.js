@@ -9,6 +9,7 @@ import healthRoutes from "./src/routes/health.routes.js";
 import messageFeedbackRoutes from "./src/routes/messageFeedback.routes.js";
 import projectsRoutes from "./src/routes/projects.routes.js";
 import voiceCharactersRoutes from "./src/routes/voiceCharacters.routes.js";
+import voiceGenerationRoutes from "./src/routes/voiceGeneration.routes.js";
 import { notFound } from "./src/middleware/notFound.middleware.js";
 import { errorHandler } from "./src/middleware/error.middleware.js";
 
@@ -34,6 +35,7 @@ app.use("/api/chats", chatSessionsRoutes);
 app.use("/api/feedback", messageFeedbackRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/voice/characters", voiceCharactersRoutes);
+app.use("/api/voice/generate", voiceGenerationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
